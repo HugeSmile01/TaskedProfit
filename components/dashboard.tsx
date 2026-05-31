@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useMemo, useState } from 'react';
 
 interface SearchJob {
   id: string;
@@ -25,9 +25,11 @@ interface Business {
   mapsUrl: string;
   openNow: boolean | null;
 }
+type ResultSort = 'confidence-desc' | 'confidence-asc' | 'rating-desc' | 'name-asc';
 
 const defaultTokenHint = 'Authenticate to create and run searches.';
 const defaultActionHint = 'Create a job, run it, and export results when ready.';
+const resultsTableColumnCount = 9;
 const initialForm = {
   locationName: 'Springfield, IL',
   latitude: 39.799,
@@ -37,6 +39,15 @@ const initialForm = {
   keywords: '',
   requireNoWebsite: true,
 };
+
+async function parseMessage(response: Response, fallback: string) {
+  try {
+    const payload = (await response.json()) as { error?: { message?: string } };
+    return payload.error?.message ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
 
 export default function Dashboard() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -55,7 +66,7 @@ export default function Dashboard() {
   const [results, setResults] = useState<Business[]>([]);
   const [selectedJobId, setSelectedJobId] = useState('');
   const [query, setQuery] = useState('');
-  const [sortBy, setSortBy] = useState<'confidence-desc' | 'confidence-asc' | 'rating-desc' | 'name-asc'>('confidence-desc');
+  const [sortBy, setSortBy] = useState<ResultSort>('confidence-desc');
   const [filters, setFilters] = useState({
     category: '',
     confidence: '',
@@ -64,31 +75,6 @@ export default function Dashboard() {
     requireNoWebsite: true,
   });
   const [form, setForm] = useState(initialForm);
-
-  useEffect(() => {
-    void checkSession();
-  }, []);
-
-  async function parseMessage(response: Response, fallback: string) {
-    try {
-      const payload = (await response.json()) as { error?: { message?: string } };
-      return payload.error?.message ?? fallback;
-    } catch {
-      return fallback;
-    }
-  }
-
-  async function checkSession() {
-    const response = await fetch('/api/auth/me');
-    if (!response.ok) {
-      setIsAuthenticated(false);
-      setAuthStatusMessage(defaultTokenHint);
-      return;
-    }
-    setIsAuthenticated(true);
-    setAuthStatusMessage('Authenticated');
-    await loadJobs();
-  }
 
   async function loadJobs() {
     setIsBusy((current) => ({ ...current, loadingJobs: true }));
@@ -130,7 +116,11 @@ export default function Dashboard() {
       results.filter((item) => {
         if (query) {
           const normalizedQuery = query.trim().toLowerCase();
-          const hasMatch = [item.name, item.address, item.phone, item.city, item.region].some((value) => value.toLowerCase().includes(normalizedQuery));
+          const hasMatch = [item.name, item.address, item.phone, item.city, item.region].some((value) =>
+            String(value ?? '')
+              .toLowerCase()
+              .includes(normalizedQuery),
+          );
           if (!hasMatch) return false;
         }
         if (filters.minRating && (item.rating ?? 0) < Number(filters.minRating)) return false;
@@ -160,7 +150,7 @@ export default function Dashboard() {
     }
   }, [filteredResults, sortBy]);
 
-  const uniqueCategories = useMemo(
+  const uniqueResultCategories = useMemo(
     () => [...new Set(results.map((item) => item.category))].sort((a, b) => a.localeCompare(b)),
     [results],
   );
@@ -432,7 +422,9 @@ export default function Dashboard() {
                   <button
                     onClick={() => {
                       setSelectedJobId(job.id);
-                      void loadResults(job.id);
+                      loadResults(job.id).catch((error: unknown) => {
+                        setActionMessage(error instanceof Error ? error.message : 'Could not load search results');
+                      });
                     }}
                     className="rounded border px-3 py-1.5 text-sm"
                   >
@@ -454,10 +446,11 @@ export default function Dashboard() {
           <div className="flex flex-wrap gap-2">
             <select
               className="rounded border p-2 text-sm"
+              aria-label="Select search job"
               value={selectedJobId}
               onChange={(e) => {
                 setSelectedJobId(e.target.value);
-                setResults([]);
+                setActionMessage('Load results to view data for the selected job.');
               }}
             >
               <option value="">Select job</option>
@@ -470,30 +463,55 @@ export default function Dashboard() {
             <button onClick={refreshResultsForSelection} className="rounded border px-3 py-1.5 text-sm">
               {isBusy.loadingResults ? 'Loading...' : 'Load Results'}
             </button>
-            <select className="rounded border p-2 text-sm" value={filters.category} onChange={(e) => setFilters({ ...filters, category: e.target.value })}>
+            <select
+              className="rounded border p-2 text-sm"
+              aria-label="Filter by category"
+              value={filters.category}
+              onChange={(e) => setFilters({ ...filters, category: e.target.value })}
+            >
               <option value="">All categories</option>
-              {uniqueCategories.map((category) => (
+              {uniqueResultCategories.map((category) => (
                 <option key={category} value={category}>
                   {category}
                 </option>
               ))}
             </select>
-            <select className="rounded border p-2 text-sm" value={filters.confidence} onChange={(e) => setFilters({ ...filters, confidence: e.target.value })}>
+            <select
+              className="rounded border p-2 text-sm"
+              aria-label="Filter by confidence level"
+              value={filters.confidence}
+              onChange={(e) => setFilters({ ...filters, confidence: e.target.value })}
+            >
               <option value="">Any confidence</option>
               <option value="90">High (90+)</option>
               <option value="75">Medium (75+)</option>
             </select>
-            <select className="rounded border p-2 text-sm" value={filters.minRating} onChange={(e) => setFilters({ ...filters, minRating: e.target.value })}>
+            <select
+              className="rounded border p-2 text-sm"
+              aria-label="Filter by minimum rating"
+              value={filters.minRating}
+              onChange={(e) => setFilters({ ...filters, minRating: e.target.value })}
+            >
               <option value="">Any rating</option>
               <option value="4.5">4.5+</option>
               <option value="4">4.0+</option>
             </select>
-            <select className="rounded border p-2 text-sm" value={filters.openNow} onChange={(e) => setFilters({ ...filters, openNow: e.target.value })}>
+            <select
+              className="rounded border p-2 text-sm"
+              aria-label="Filter by open status"
+              value={filters.openNow}
+              onChange={(e) => setFilters({ ...filters, openNow: e.target.value })}
+            >
               <option value="">Any open status</option>
               <option value="open">Open now</option>
               <option value="closed">Closed now</option>
             </select>
-            <select className="rounded border p-2 text-sm" value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)}>
+            <select
+              className="rounded border p-2 text-sm"
+              aria-label="Sort results"
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as ResultSort)}
+            >
               <option value="confidence-desc">Confidence (high to low)</option>
               <option value="confidence-asc">Confidence (low to high)</option>
               <option value="rating-desc">Rating (high to low)</option>
@@ -539,7 +557,7 @@ export default function Dashboard() {
             <tbody>
               {sortedResults.length === 0 ? (
                 <tr>
-                  <td className="py-4 text-gray-500" colSpan={9}>
+                  <td className="py-4 text-gray-500" colSpan={resultsTableColumnCount}>
                     No results.
                   </td>
                 </tr>
