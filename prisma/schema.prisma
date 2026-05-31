@@ -1,0 +1,157 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  admin
+  user
+}
+
+enum SearchJobStatus {
+  pending
+  processing
+  completed
+  failed
+}
+
+model User {
+  id            String        @id @default(cuid())
+  email         String        @unique
+  passwordHash  String
+  role          Role          @default(user)
+  searchJobs    SearchJob[]
+  savedSearches SavedSearch[]
+  exports       Export[]
+  auditLogs     AuditLog[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([email])
+}
+
+model SearchJob {
+  id               String              @id @default(cuid())
+  userId           String
+  user             User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status           SearchJobStatus     @default(pending)
+  locationName     String
+  latitude         Float
+  longitude        Float
+  radius           Int
+  category         String
+  keywords         String?
+  requireNoWebsite Boolean             @default(true)
+  errorMessage     String?
+  results          SearchJobBusiness[]
+  exports          Export[]
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([status])
+  @@index([category])
+}
+
+model Business {
+  id                String              @id @default(cuid())
+  placeId           String              @unique
+  name              String
+  normalizedName    String
+  category          String
+  address           String
+  normalizedAddress String
+  city              String
+  region            String
+  phone             String
+  websiteUrl        String?
+  mapsUrl           String
+  rating            Float?
+  reviewCount       Int                 @default(0)
+  openingStatus     String?
+  openNow           Boolean?
+  latitude          Float
+  longitude         Float
+  confidenceScore   Int
+  confidenceLabel   String
+  sourceMetadata    Json
+  searchJobs        SearchJobBusiness[]
+  sources           BusinessSource[]
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@index([category])
+  @@index([city, region])
+  @@index([confidenceScore])
+  @@index([rating])
+  @@index([normalizedName, normalizedAddress])
+}
+
+model SearchJobBusiness {
+  id         String   @id @default(cuid())
+  searchJobId String
+  businessId String
+  searchJob  SearchJob @relation(fields: [searchJobId], references: [id], onDelete: Cascade)
+  business   Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  createdAt  DateTime  @default(now())
+
+  @@unique([searchJobId, businessId])
+  @@index([searchJobId])
+  @@index([businessId])
+}
+
+model BusinessSource {
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  sourceName String
+  sourceId   String
+  metadata   Json
+  verifiedAt DateTime?
+  createdAt  DateTime @default(now())
+
+  @@index([businessId])
+  @@index([sourceName, sourceId])
+}
+
+model SavedSearch {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  payload   Json
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Export {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  searchJobId String
+  searchJob  SearchJob @relation(fields: [searchJobId], references: [id], onDelete: Cascade)
+  filters    Json
+  rowCount   Int
+  fileUrl    String?
+  createdAt  DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([searchJobId])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action    String
+  details   Json
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([action])
+}
