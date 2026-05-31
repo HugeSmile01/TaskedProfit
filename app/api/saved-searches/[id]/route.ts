@@ -4,7 +4,7 @@ import { db } from '@/models/store';
 import { fail, ok } from '@/utils/response';
 
 export async function DELETE(request: NextRequest, context: { params: Promise<{ id: string }> }) {
-  const auth = await requireAuth(request);
+  const auth = await requireAuth();
   if ('error' in auth) return auth.error;
 
   const { id } = await context.params;

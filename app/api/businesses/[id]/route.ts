@@ -5,7 +5,7 @@ import { fail, ok } from '@/utils/response';
 import { businessPatchSchema } from '@/utils/validation';
 
 export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
-  const auth = await requireAuth(request);
+  const auth = await requireAuth();
   if ('error' in auth) return auth.error;
 
   const { id } = await context.params;
@@ -16,7 +16,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
 }
 
 export async function PATCH(request: NextRequest, context: { params: Promise<{ id: string }> }) {
-  const auth = await requireAuth(request);
+  const auth = await requireAuth();
   if ('error' in auth) return auth.error;
 
   const { id } = await context.params;

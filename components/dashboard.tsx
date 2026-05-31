@@ -21,10 +21,12 @@ interface Business {
   openNow: boolean | null;
 }
 
-const defaultTokenHint = 'Login with admin@taskedprofit.local / ChangeMe123!';
+const defaultTokenHint = 'Authenticate to create and run searches.';
 
 export default function Dashboard() {
-  const [tokenHint, setTokenHint] = useState(defaultTokenHint);
+  const [authStatusMessage, setAuthStatusMessage] = useState(defaultTokenHint);
+  const [actionMessage, setActionMessage] = useState('');
+  const [credentials, setCredentials] = useState({ email: '', password: '' });
   const [jobs, setJobs] = useState<SearchJob[]>([]);
   const [results, setResults] = useState<Business[]>([]);
   const [filters, setFilters] = useState({ category: '', confidence: '' });
@@ -49,13 +51,18 @@ export default function Dashboard() {
   );
 
   async function login() {
+    if (!credentials.email || !credentials.password) {
+      setAuthStatusMessage('Email and password are required');
+      return;
+    }
+
     const res = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: 'admin@taskedprofit.local', password: 'ChangeMe123!' }),
+      body: JSON.stringify(credentials),
     });
 
-    setTokenHint(res.ok ? 'Authenticated' : 'Authentication failed');
+    setAuthStatusMessage(res.ok ? 'Authenticated' : 'Authentication failed');
   }
 
   async function createJob(event: FormEvent<HTMLFormElement>) {
@@ -66,10 +73,14 @@ export default function Dashboard() {
       body: JSON.stringify(form),
     });
 
-    if (!res.ok) return;
+    if (!res.ok) {
+      setActionMessage('Could not create search job');
+      return;
+    }
 
     const payload = (await res.json()).data as SearchJob;
     setJobs((current) => [payload, ...current]);
+    setActionMessage('Search job created');
   }
 
   async function runJob(jobId: string) {
@@ -87,7 +98,10 @@ export default function Dashboard() {
   }
 
   async function exportCsv() {
-    if (!jobs[0]) return;
+    if (!jobs[0]) {
+      setActionMessage('No search jobs available to export');
+      return;
+    }
 
     const res = await fetch('/api/exports', {
       method: 'POST',
@@ -95,7 +109,10 @@ export default function Dashboard() {
       body: JSON.stringify({ searchJobId: jobs[0].id, filters: { ...filters } }),
     });
 
-    if (!res.ok) return;
+    if (!res.ok) {
+      setActionMessage('Could not export CSV');
+      return;
+    }
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -103,6 +120,7 @@ export default function Dashboard() {
     link.download = 'taskedprofit-results.csv';
     link.click();
     URL.revokeObjectURL(url);
+    setActionMessage('CSV export downloaded');
   }
 
   return (
@@ -112,12 +130,36 @@ export default function Dashboard() {
           <h1 className="text-2xl font-semibold">TaskedProfit</h1>
           <p className="text-sm text-gray-600">Find active businesses without websites.</p>
         </div>
-        <button onClick={login} className="rounded bg-black px-4 py-2 text-white">
-          Login Demo User
-        </button>
+        <div className="flex flex-col md:flex-row gap-2">
+          <label htmlFor="login-email" className="sr-only">
+            Email
+          </label>
+          <input
+            id="login-email"
+            className="rounded border p-2 text-sm"
+            placeholder="Email"
+            value={credentials.email}
+            onChange={(e) => setCredentials((current) => ({ ...current, email: e.target.value }))}
+          />
+          <label htmlFor="login-password" className="sr-only">
+            Password
+          </label>
+          <input
+            id="login-password"
+            className="rounded border p-2 text-sm"
+            type="password"
+            placeholder="Password"
+            value={credentials.password}
+            onChange={(e) => setCredentials((current) => ({ ...current, password: e.target.value }))}
+          />
+          <button onClick={login} className="rounded bg-black px-4 py-2 text-white">
+            Login
+          </button>
+        </div>
       </header>
 
-      <p className="text-xs text-gray-500">{tokenHint}</p>
+      <p className="text-xs text-gray-500">{authStatusMessage}</p>
+      {actionMessage ? <p className="text-xs text-gray-600">{actionMessage}</p> : null}
 
       <section className="rounded border p-4">
         <h2 className="font-medium mb-3">Create Search Job</h2>
@@ -193,7 +235,7 @@ export default function Dashboard() {
                     <td>{item.address}</td>
                     <td>{item.phone}</td>
                     <td>{item.confidenceScore}</td>
-                    <td>{item.openNow ? 'Open' : 'Closed'}</td>
+                    <td>{item.openNow === null ? 'Unknown' : item.openNow ? 'Open' : 'Closed'}</td>
                     <td>
                       <a href={item.mapsUrl} target="_blank" rel="noreferrer" className="text-blue-600">
                         View

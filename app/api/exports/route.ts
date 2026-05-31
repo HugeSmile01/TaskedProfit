@@ -3,12 +3,13 @@ import { requireAuth } from '@/middleware/authGuard';
 import { db } from '@/models/store';
 import { getSearchJobResults } from '@/services/searchService';
 import { businessesToCsv } from '@/utils/csv';
+import { normalizeExportFilters } from '@/utils/exportFilters';
 import { filterBusinesses } from '@/utils/filter';
 import { fail, ok } from '@/utils/response';
 import { exportSchema } from '@/utils/validation';
 
 export async function POST(request: NextRequest) {
-  const auth = await requireAuth(request);
+  const auth = await requireAuth();
   if ('error' in auth) return auth.error;
 
   const parsed = exportSchema.safeParse(await request.json());
@@ -24,15 +25,17 @@ export async function POST(request: NextRequest) {
     region: filters.region as string | undefined,
     confidence: typeof filters.confidence === 'number' ? filters.confidence : undefined,
     minRating: typeof filters.minRating === 'number' ? filters.minRating : undefined,
-    openNow: filters.openNow === true,
-    requireNoWebsite: true,
+    openNow: typeof filters.openNow === 'boolean' ? filters.openNow : undefined,
+    requireNoWebsite: typeof filters.requireNoWebsite === 'boolean' ? filters.requireNoWebsite : true,
   });
+
+  const normalizedFilters = normalizeExportFilters(filters);
 
   const exportRecord = {
     id: crypto.randomUUID(),
     userId: auth.user.sub,
     searchJobId,
-    filters,
+    filters: normalizedFilters,
     rowCount: results.length,
     createdAt: new Date().toISOString(),
   };
@@ -48,8 +51,8 @@ export async function POST(request: NextRequest) {
   });
 }
 
-export async function GET(request: NextRequest) {
-  const auth = await requireAuth(request);
+export async function GET() {
+  const auth = await requireAuth();
   if ('error' in auth) return auth.error;
 
   return ok(db.exports.filter((item) => item.userId === auth.user.sub));

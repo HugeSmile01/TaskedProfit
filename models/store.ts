@@ -64,7 +64,7 @@ export const db = {
       email: 'admin@taskedprofit.local',
       name: 'Admin User',
       role: 'admin',
-      password: 'ChangeMe123!',
+      passwordHash: '$2b$10$vsJA1rrhGoVyarZLZI5BFuPExY7fR42XnvYCXskoWtPCG.AHi4N8q',
     },
   ] as User[],
   searchJobs: [] as SearchJob[],

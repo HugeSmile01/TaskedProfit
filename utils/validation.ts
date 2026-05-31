@@ -23,7 +23,7 @@ export const businessPatchSchema = z.object({
 
 export const exportSchema = z.object({
   searchJobId: z.string().min(1),
-  filters: z.record(z.union([z.string(), z.number(), z.boolean()])).default({}),
+  filters: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).default({}),
 });
 
 export const savedSearchSchema = z.object({

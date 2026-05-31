@@ -1,7 +1,7 @@
 import { Business } from '@/models/types';
 
 export const normalizeText = (value: string): string =>
-  value.trim().toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ');
+  value.trim().toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, '').replace(/\s+/g, ' ');
 
 export function deduplicateBusinesses(businesses: Business[]): Business[] {
   const seen = new Set<string>();

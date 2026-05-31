@@ -5,7 +5,7 @@ export interface User {
   email: string;
   name: string;
   role: UserRole;
-  password: string;
+  passwordHash: string;
 }
 
 export type SearchJobStatus = 'pending' | 'processing' | 'completed' | 'failed';

@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { requireAuth } from '@/middleware/authGuard';
 import { AUTH_COOKIE, signAccessToken } from '@/utils/auth';
 
-export async function POST(request: NextRequest) {
-  const auth = await requireAuth(request);
+export async function POST() {
+  const auth = await requireAuth();
   if ('error' in auth) return auth.error;
 
   const token = await signAccessToken({ sub: auth.user.sub, email: auth.user.email, role: auth.user.role });

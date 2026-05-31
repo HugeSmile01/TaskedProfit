@@ -28,3 +28,17 @@ test('scoreBusinessConfidence returns low score for sparse business', () => {
 
   assert.equal(score.label, 'low');
 });
+
+test('scoreBusinessConfidence returns medium score for partial business', () => {
+  const score = scoreBusinessConfidence({
+    placeId: 'place123',
+    address: '123 Main Street, Springfield',
+    phone: '+1-555-123-4567',
+    openingStatus: null,
+    rating: 4.2,
+    reviewCount: 0,
+  });
+
+  assert.equal(score.score, 75);
+  assert.equal(score.label, 'medium');
+});

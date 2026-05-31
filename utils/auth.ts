@@ -1,11 +1,19 @@
-import { SignJWT, jwtVerify } from 'jose';
+import { JWTPayload, SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
 import { UserRole } from '@/models/types';
 
-const secret = new TextEncoder().encode(process.env.JWT_SECRET ?? 'dev-only-secret-change-me');
+function getSecret() {
+  const jwtSecret = process.env.JWT_SECRET;
+  const isProduction =
+    process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production';
+  if (!jwtSecret && isProduction) {
+    throw new Error('JWT_SECRET must be set in production');
+  }
+  return new TextEncoder().encode(jwtSecret ?? 'local-dev-secret-only');
+}
 const accessCookieName = 'tp_access';
 
-interface TokenPayload {
+interface TokenPayload extends JWTPayload {
   sub: string;
   email: string;
   role: UserRole;
@@ -16,11 +24,11 @@ export async function signAccessToken(payload: TokenPayload) {
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime('15m')
-    .sign(secret);
+    .sign(getSecret());
 }
 
 export async function verifyAccessToken(token: string) {
-  const { payload } = await jwtVerify(token, secret);
+  const { payload } = await jwtVerify(token, getSecret());
   return payload as unknown as TokenPayload;
 }
 

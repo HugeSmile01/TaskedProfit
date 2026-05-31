@@ -5,7 +5,7 @@ import { fail, ok } from '@/utils/response';
 import { savedSearchSchema } from '@/utils/validation';
 
 export async function POST(request: NextRequest) {
-  const auth = await requireAuth(request);
+  const auth = await requireAuth();
   if ('error' in auth) return auth.error;
 
   const parsed = savedSearchSchema.safeParse(await request.json());
@@ -23,8 +23,8 @@ export async function POST(request: NextRequest) {
   return ok(item, 201);
 }
 
-export async function GET(request: NextRequest) {
-  const auth = await requireAuth(request);
+export async function GET() {
+  const auth = await requireAuth();
   if ('error' in auth) return auth.error;
 
   return ok(db.savedSearches.filter((item) => item.userId === auth.user.sub));
